@@ -55,4 +55,4 @@ services:
       # CORS — Render gives you a .onrender.com URL
       # Update this after first deploy with your actual URL
       - key: CORS_ORIGINS
-        value: "https://finance-ai.onrender.com"
+        value: "https://finance-ai-ogcx.onrender.com"

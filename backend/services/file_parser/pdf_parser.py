@@ -47,10 +47,17 @@ _HEADER_KEYWORDS = {
     "withdrawal", "deposit",
 }
 
-# Date pattern for detecting date-like cells
-_DATE_PATTERN = re.compile(
-    r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$"
-)
+# Date patterns for detecting date-like cells (expanded for Indian banks)
+_DATE_PATTERNS = [
+    # dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy
+    re.compile(r"^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$"),
+    # dd Mon yyyy, dd-Mon-yyyy, dd/Mon/yyyy (e.g. 01 Jan 2025, 01-Jan-25)
+    re.compile(r"^\d{1,2}[/\-.\s](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[/\-.\s]\d{2,4}$", re.IGNORECASE),
+    # yyyy-mm-dd (ISO)
+    re.compile(r"^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}$"),
+    # dd Mon yy or dd Mon yyyy without separator (e.g. "01Jan2025")
+    re.compile(r"^\d{1,2}(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\d{2,4}$", re.IGNORECASE),
+]
 
 # Synthetic headers for common Indian bank PDF layouts
 _SYNTHETIC_HEADERS = {
@@ -230,11 +237,24 @@ class PDFParser:
 
     @staticmethod
     def _row_has_date(row: list[str | None]) -> bool:
-        """Check if a row contains a date-like value in the first 2 columns."""
-        for cell in row[:2]:
+        """Check if a row contains a date-like value in the first 3 columns."""
+        for cell in row[:3]:
             if cell is None:
                 continue
             val = str(cell).strip()
-            if _DATE_PATTERN.match(val):
-                return True
+            if not val or val.lower() in ("nan", "none"):
+                continue
+            # Check all date patterns
+            for pattern in _DATE_PATTERNS:
+                if pattern.match(val):
+                    return True
+            # Fallback: try dateutil parse for unusual formats
+            try:
+                from dateutil import parser as dp
+                result = dp.parse(val, dayfirst=True, fuzzy=False)
+                # Only accept if the string is reasonably short (date-like)
+                if len(val) <= 20 and result:
+                    return True
+            except Exception:
+                pass
         return False
