@@ -25,12 +25,9 @@ services:
     # Health check path
     healthCheckPath: /health
 
-    # Persistent disk for SQLite database
-    # Without this, data is lost on every deploy!
-    disk:
-      name: finance-ai-data
-      mountPath: /app/database
-      sizeGB: 1
+    # NOTE: Free tier has no persistent disk.
+    # SQLite data persists between requests but is lost on redeploy.
+    # Upgrade to a paid plan ($7/mo) to add a persistent disk.
 
     # Environment variables
     envVars:
