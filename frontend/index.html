@@ -107,6 +107,9 @@
         <li><a href="#" class="nav-link" data-page="insights">
           <span class="nav-icon">◉</span> Insights
         </a></li>
+        <li><a href="#" class="nav-link" id="nav-help">
+          <span class="nav-icon">?</span> Help / Guide
+        </a></li>
       </ul>
       <div class="sidebar-footer">
         <div class="user-badge">
@@ -284,6 +287,97 @@
       </div>
 
     </main>
+  </div>
+
+  <!-- ── ONBOARDING GUIDE ── -->
+  <div id="onboarding-overlay" class="onboarding-overlay hidden">
+    <div class="onboarding-card">
+      <div class="onboarding-header">
+        <span class="onboarding-logo">⬡</span>
+        <h2>Welcome to Finance<span class="accent">AI</span></h2>
+        <p class="onboarding-subtitle">Your privacy-first personal finance analyzer</p>
+      </div>
+
+      <div class="onboarding-steps">
+        <!-- Step 1 -->
+        <div class="onboarding-step" data-step="1">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Create an Account</h3>
+            <p>Go to <strong>Accounts → + New Account</strong> and add your bank account (e.g. "HDFC Savings", "ICICI Credit Card").</p>
+            <div class="step-tip">
+              <span class="tip-icon">💡</span>
+              <span>You can add multiple accounts — savings, credit cards, wallets, UPI, and cash.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="onboarding-step" data-step="2">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Upload Bank Statement</h3>
+            <p>Go to <strong>Upload</strong>, select your account, and drag & drop your bank statement file.</p>
+            <div class="step-formats">
+              <div class="format-badge csv">CSV</div>
+              <div class="format-badge xlsx">Excel (.xlsx)</div>
+              <div class="format-badge pdf">PDF</div>
+            </div>
+            <div class="step-warning">
+              <span class="warn-icon">⚠️</span>
+              <span><strong>Important:</strong> Files must be <strong>without password</strong> protection. If your bank statement PDF is locked, remove the password first using any free PDF unlocker.</span>
+            </div>
+            <div class="step-tip">
+              <span class="tip-icon">📄</span>
+              <span>Download your statement from your bank's net-banking portal. Most banks provide CSV or PDF exports.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="onboarding-step" data-step="3">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>View Dashboard & Analytics</h3>
+            <p>Once uploaded, head to <strong>Overview</strong> to see your financial summary — income, expenses, savings rate, and health score.</p>
+            <div class="step-features">
+              <span class="feature-pill">📊 Spending by Category</span>
+              <span class="feature-pill">📈 Income vs Expense Trends</span>
+              <span class="feature-pill">💰 Net Savings</span>
+              <span class="feature-pill">❤️ Financial Health Score</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="onboarding-step" data-step="4">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h3>Get AI Insights</h3>
+            <p>Visit <strong>Insights</strong> for AI-generated tips about your spending patterns, unusual transactions, and savings opportunities.</p>
+            <div class="step-tip">
+              <span class="tip-icon">🔒</span>
+              <span>All your data stays <strong>100% local</strong> — nothing is sent to any cloud or third-party.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="guest-note" class="guest-note hidden">
+        <span class="warn-icon">ℹ️</span>
+        <span><strong>Guest Mode:</strong> Your data is stored in memory only and will be <strong>deleted</strong> when you logout or close the browser.</span>
+      </div>
+
+      <div class="onboarding-actions">
+        <label class="onboarding-checkbox">
+          <input type="checkbox" id="dont-show-again" />
+          <span>Don't show this again</span>
+        </label>
+        <button class="btn btn-primary btn-full" id="btn-onboarding-close">
+          Got it, let's go! →
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal -->

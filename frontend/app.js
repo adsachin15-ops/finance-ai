@@ -159,6 +159,12 @@ const App = (() => {
     _el("user-name").textContent = state.user?.display_name || "User";
     _el("user-mode").textContent = state.isGuest ? "Guest Session" : "Registered";
     _loadAccounts().then(() => navigateTo("overview"));
+
+    // Show onboarding guide for new users (unless dismissed)
+    const dismissed = localStorage.getItem("finance_onboarding_dismissed");
+    if (!dismissed) {
+      _showOnboarding();
+    }
   }
 
   // ── Overview ─────────────────────────────────────────────
@@ -545,6 +551,47 @@ const App = (() => {
     if (e.target === _el("modal-overlay")) _closeModal();
   });
 
+  // ── Onboarding Guide ──────────────────────────────────────
+  function _showOnboarding() {
+    const overlay = _el("onboarding-overlay");
+    const guestNote = _el("guest-note");
+    if (!overlay) return;
+
+    // Show/hide guest-specific note
+    if (state.isGuest && guestNote) {
+      guestNote.classList.remove("hidden");
+    } else if (guestNote) {
+      guestNote.classList.add("hidden");
+    }
+
+    // Reset checkbox
+    const checkbox = _el("dont-show-again");
+    if (checkbox) checkbox.checked = false;
+
+    overlay.classList.remove("hidden");
+  }
+
+  function _hideOnboarding() {
+    const overlay = _el("onboarding-overlay");
+    const checkbox = _el("dont-show-again");
+    if (!overlay) return;
+
+    if (checkbox && checkbox.checked) {
+      localStorage.setItem("finance_onboarding_dismissed", "true");
+    }
+
+    overlay.classList.add("hidden");
+  }
+
+  // Bind onboarding close button
+  _el("btn-onboarding-close")?.addEventListener("click", _hideOnboarding);
+
+  // Bind Help sidebar link
+  _el("nav-help")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    _showOnboarding();
+  });
+
   // ── Toast ─────────────────────────────────────────────────
   function toast(msg, type = "info") {
     const c = document.getElementById("toast-container");
@@ -594,6 +641,7 @@ const App = (() => {
     txPrev,
     txNext,
     toast,
+    showOnboarding: _showOnboarding,
   };
 
 })();
