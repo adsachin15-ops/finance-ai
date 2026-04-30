@@ -1,0 +1,110 @@
+# ============================================================
+# Finance-AI — Docker Compose (Production)
+# ============================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml down
+#   docker compose -f docker-compose.prod.yml logs -f
+#
+# Differences from development:
+#   - No source code mounts (immutable image)
+#   - No hot reload
+#   - Stricter resource limits
+#   - JSON logging for log aggregators
+#   - Read-only filesystem where possible
+#   - No debug endpoints
+# ============================================================
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+
+    image: finance-ai:prod
+
+    container_name: finance-ai-prod
+
+    restart: always             # always restart in production
+
+    ports:
+      - "127.0.0.1:8000:8000"  # bind to localhost only — use nginx in front
+
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      LOG_FORMAT: json          # JSON for log aggregators
+      LOG_LEVEL: WARNING        # less noise in production
+
+      DB_PATH: /app/data/finance.db
+      GUEST_DB_PATH: ""
+
+      # Secrets must be injected — never hardcoded
+      DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY:?DB_ENCRYPTION_KEY is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+
+    volumes:
+      # Persistent data — named volumes only
+      # No source code mounts in production
+      - finance_prod_data:/app/data
+      - finance_prod_logs:/app/logs
+      - finance_prod_uploads:/app/uploads
+
+    # Production CMD: no reload, minimal logging
+    command: >
+      python -m uvicorn backend.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 1
+      --log-level warning
+      --no-access-log
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+    # Stricter resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true  # prevent privilege escalation
+
+    # Read-only root filesystem
+    # Only explicitly mounted volumes are writable
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777  # writable temp space
+
+
+volumes:
+  finance_prod_data:
+    driver: local
+    name: finance-ai-prod-data
+
+  finance_prod_logs:
+    driver: local
+    name: finance-ai-prod-logs
+
+  finance_prod_uploads:
+    driver: local
+    name: finance-ai-prod-uploads
+
+
+networks:
+  default:
+    name: finance-ai-prod-network

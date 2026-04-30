@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance-AI</title>
+  <link rel="stylesheet" href="/main.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── AUTH SCREEN ── -->
+  <div id="auth-screen" class="screen active">
+    <div class="auth-container">
+      <div class="auth-logo">
+        <span class="logo-icon">⬡</span>
+        <h1>Finance<span class="accent">AI</span></h1>
+        <p class="tagline">Privacy-first · Local · Intelligent</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="tab-btn active" data-tab="login">Login</button>
+        <button class="tab-btn" data-tab="register">Register</button>
+        <button class="tab-btn" data-tab="guest">Guest</button>
+      </div>
+
+      <!-- Login -->
+      <div id="tab-login" class="tab-panel active">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="login-phone" placeholder="+91 XXXXXXXXXX" />
+        </div>
+        <div class="form-group">
+          <label>PIN</label>
+          <input type="password" id="login-pin" placeholder="4-8 digit PIN" maxlength="8" />
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-login">Login</button>
+        <div id="login-error" class="error-msg hidden"></div>
+      </div>
+
+      <!-- Register -->
+      <div id="tab-register" class="tab-panel">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="reg-phone" placeholder="+91 XXXXXXXXXX" />
+        </div>
+        <div class="form-group">
+          <label>Display Name <span class="optional">(optional)</span></label>
+          <input type="text" id="reg-name" placeholder="Your name" maxlength="100" />
+        </div>
+        <div class="form-group">
+          <label>PIN</label>
+          <input type="password" id="reg-pin" placeholder="Choose 4-8 digit PIN" maxlength="8" />
+        </div>
+        <div class="form-group">
+          <label>Confirm PIN</label>
+          <input type="password" id="reg-pin-confirm" placeholder="Repeat PIN" maxlength="8" />
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-register">Create Account</button>
+        <div id="reg-error" class="error-msg hidden"></div>
+      </div>
+
+      <!-- Guest -->
+      <div id="tab-guest" class="tab-panel">
+        <div class="guest-info">
+          <div class="guest-icon">🔒</div>
+          <h3>Guest Mode</h3>
+          <p>Analyze transactions without creating an account.</p>
+          <ul>
+            <li>✓ Full analysis capabilities</li>
+            <li>✓ No account required</li>
+            <li>✓ Data in memory only</li>
+            <li>✗ Deleted on session end</li>
+          </ul>
+        </div>
+        <button class="btn btn-secondary btn-full" id="btn-guest">
+          Start Guest Session
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DASHBOARD SCREEN ── -->
+  <div id="dashboard-screen" class="screen">
+
+    <!-- Sidebar -->
+    <nav id="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">⬡</span>
+        <span>Finance<span class="accent">AI</span></span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#" class="nav-link active" data-page="overview">
+          <span class="nav-icon">◈</span> Overview
+        </a></li>
+        <li><a href="#" class="nav-link" data-page="transactions">
+          <span class="nav-icon">◇</span> Transactions
+        </a></li>
+        <li><a href="#" class="nav-link" data-page="accounts">
+          <span class="nav-icon">◆</span> Accounts
+        </a></li>
+        <li><a href="#" class="nav-link" data-page="upload">
+          <span class="nav-icon">⬆</span> Upload
+        </a></li>
+        <li><a href="#" class="nav-link" data-page="insights">
+          <span class="nav-icon">◉</span> Insights
+        </a></li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="user-badge">
+          <span class="user-avatar">◈</span>
+          <div>
+            <div id="user-name" class="user-name">—</div>
+            <div id="user-mode" class="user-mode">—</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-logout">Logout</button>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content">
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="page-title">Overview</h2>
+          <div id="breadcrumb" class="breadcrumb">Dashboard / Overview</div>
+        </div>
+        <div class="topbar-right">
+          <select id="period-selector" class="select-sm">
+            <option value="monthly">This Month</option>
+            <option value="weekly">This Week</option>
+            <option value="yearly">This Year</option>
+            <option value="daily">Today</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="btn-upload-quick">+ Upload</button>
+        </div>
+      </header>
+
+      <!-- PAGE: OVERVIEW -->
+      <div id="page-overview" class="page active">
+        <div class="kpi-grid">
+          <div class="kpi-card income">
+            <div class="kpi-label">Total Income</div>
+            <div class="kpi-value" id="kpi-income">₹—</div>
+            <div class="kpi-sub" id="kpi-income-sub"></div>
+          </div>
+          <div class="kpi-card expense">
+            <div class="kpi-label">Total Expenses</div>
+            <div class="kpi-value" id="kpi-expenses">₹—</div>
+          </div>
+          <div class="kpi-card savings">
+            <div class="kpi-label">Net Savings</div>
+            <div class="kpi-value" id="kpi-savings">₹—</div>
+            <div class="kpi-sub" id="kpi-savings-rate"></div>
+          </div>
+          <div class="kpi-card health">
+            <div class="kpi-label">Health Score</div>
+            <div class="kpi-value" id="kpi-health">—</div>
+            <div class="kpi-sub">out of 100</div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header"><h3>Spending by Category</h3></div>
+            <div class="chart-body">
+              <canvas id="chart-category"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>Income vs Expenses</h3></div>
+            <div class="chart-body">
+              <canvas id="chart-trend"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Account Balances</h3>
+            <button class="btn btn-ghost btn-sm" onclick="App.showAddAccountModal()">+ Add Account</button>
+          </div>
+          <div id="account-balances-list" class="account-list">
+            <div class="empty-state">No accounts yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: TRANSACTIONS -->
+      <div id="page-transactions" class="page">
+        <div class="card">
+          <div class="card-header">
+            <h3>Transactions</h3>
+            <div class="filter-bar">
+              <input type="text" id="tx-search" placeholder="Search..." class="input-sm" />
+              <select id="tx-filter-type" class="select-sm">
+                <option value="">All Types</option>
+                <option value="debit">Debit</option>
+                <option value="credit">Credit</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th>Account</th>
+                  <th class="text-right">Amount</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody id="transactions-tbody">
+                <tr><td colspan="6" class="empty-state">No transactions loaded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="tx-pagination" class="pagination"></div>
+        </div>
+      </div>
+
+      <!-- PAGE: ACCOUNTS -->
+      <div id="page-accounts" class="page">
+        <div class="card">
+          <div class="card-header">
+            <h3>Accounts</h3>
+            <button class="btn btn-primary btn-sm" onclick="App.showAddAccountModal()">+ New Account</button>
+          </div>
+          <div id="accounts-grid" class="account-list">
+            <div class="empty-state">No accounts added yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: UPLOAD -->
+      <div id="page-upload" class="page">
+        <div class="card">
+          <div class="card-header"><h3>Upload Transaction File</h3></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label>Select Account</label>
+              <select id="upload-account-select" class="select-full">
+                <option value="">— Choose account —</option>
+              </select>
+            </div>
+            <div id="drop-zone" class="drop-zone"
+              ondragover="event.preventDefault()"
+              ondrop="App.handleDrop(event)">
+              <span class="drop-icon">⬆</span>
+              <p>Drag & drop your bank statement here</p>
+              <p class="drop-sub">or</p>
+              <label class="btn btn-secondary" for="file-input">Browse File</label>
+              <input type="file" id="file-input" accept=".csv,.xlsx,.pdf" class="hidden" />
+              <p class="drop-formats">Accepted: CSV, Excel, PDF · Max 10MB</p>
+            </div>
+            <div id="upload-progress" class="upload-progress hidden">
+              <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+              </div>
+              <div id="progress-label" class="progress-label">Processing...</div>
+            </div>
+            <div id="upload-result" class="hidden"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Upload History</h3></div>
+          <div id="upload-history">
+            <div class="empty-state">No uploads yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: INSIGHTS -->
+      <div id="page-insights" class="page">
+        <div id="insights-list" class="insights-list">
+          <div class="empty-state">No insights yet. Upload transactions to generate insights.</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal-box" class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-title">—</h3>
+        <button class="btn-close" id="modal-close">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast-container" class="toast-container"></div>
+
+</div>
+
+<script src="/api.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

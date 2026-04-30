@@ -1,0 +1,60 @@
+# ============================================================
+# Finance-AI — Docker Ignore
+# ============================================================
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Tests
+tests/
+pytest.ini
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Dev files
+*.log
+logs/
+uploads/temp/
+backup/
+
+# Database (mounted as volume in container)
+database/*.db
+database/*.db-shm
+database/*.db-wal
+
+# Environment (never copy .env into image)
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docs
+docs/
+*.md
+!README.md
+
+# Debug files
+*.txt
+!requirements.txt
+debug_*.py
+remove_*.py

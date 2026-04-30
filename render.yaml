@@ -1,0 +1,61 @@
+# ============================================================
+# Finance-AI — Render Blueprint (render.yaml)
+# ============================================================
+# Deploy: Push this repo to GitHub, then on Render:
+#   1. New > Blueprint > Connect your repo
+#   2. Render reads this file and auto-configures everything
+#
+# Manual deploy alternative:
+#   New > Web Service > Docker > Connect repo
+# ============================================================
+
+services:
+  - type: web
+    name: finance-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # Render region (oregon is default, change if needed)
+    region: oregon
+
+    # Free tier or paid
+    plan: free
+
+    # Health check path
+    healthCheckPath: /health
+
+    # Persistent disk for SQLite database
+    # Without this, data is lost on every deploy!
+    disk:
+      name: finance-ai-data
+      mountPath: /app/database
+      sizeGB: 1
+
+    # Environment variables
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: WARNING
+      - key: DB_PATH
+        value: /app/database/finance.db
+      - key: GUEST_DB_PATH
+        value: ""
+
+      # Secrets — set these in Render Dashboard, not here
+      - key: DB_ENCRYPTION_KEY
+        generateValue: true   # Render auto-generates a random value
+      - key: SECRET_KEY
+        generateValue: true   # Render auto-generates a random value
+
+      # CORS — Render gives you a .onrender.com URL
+      # Update this after first deploy with your actual URL
+      - key: CORS_ORIGINS
+        value: "https://finance-ai.onrender.com"

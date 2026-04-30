@@ -1,0 +1,73 @@
+# ============================================================
+# Finance-AI — Git Ignore
+# ============================================================
+
+# --- Python ---
+venv/
+venv_win/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# --- Environment ---
+.env
+.env.*
+!.env.example
+
+# --- Database ---
+database/*.db
+database/*.db-shm
+database/*.db-wal
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Uploads ---
+uploads/temp/
+
+# --- Backups ---
+backup/
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+pytest_failures.txt
+
+# --- Debug / Scratch Files ---
+debug_report.txt
+uvicorn_error.txt
+claude_debug_input.txt
+file_index.txt
+project_structure.txt
+
+# --- Sample Data Files ---
+*.zip
+icici_credit.pdf
+icicisal.pdf
+sbiex.xlsx
+sbiex_unlocked.xlsx
+sbipd_unlocked.pdf
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,103 @@
+# ============================================================
+# Finance-AI — Docker Compose (Development)
+# ============================================================
+# Usage:
+#   docker compose up --build      start with rebuild
+#   docker compose up -d           start detached
+#   docker compose down            stop and remove containers
+#   docker compose logs -f         follow logs
+#   docker compose exec app bash   open shell in container
+# ============================================================
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime         # use runtime stage
+
+    image: finance-ai:dev
+
+    container_name: finance-ai-dev
+
+    # Restart policy: restart unless manually stopped
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"           # host:container
+
+    environment:
+      # Override .env values for development container
+      APP_ENV: development
+      DEBUG: "false"
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      LOG_FORMAT: console
+      LOG_LEVEL: INFO
+
+      # Database — stored in app directory
+      DB_PATH: /app/database/finance.db
+      GUEST_DB_PATH: ""
+
+      # These MUST be set in .env or via environment
+      # docker compose will read from .env automatically
+      DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+
+    volumes:
+      # Persistent logs
+      - finance_logs:/app/logs
+
+      # Hot reload: mount source code (dev only)
+      # Remove in production docker-compose.prod.yml
+      - ./backend:/app/backend:ro
+      - ./frontend:/app/frontend:ro
+
+    # Override CMD for development: enable hot reload
+    command: >
+      python -m uvicorn backend.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/backend
+      --log-level info
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Resource limits (adjust based on host machine)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+
+
+# ── Named Volumes ─────────────────────────────────────────────────
+# Named volumes persist across container restarts and rebuilds.
+# Data survives: docker compose down (but NOT docker compose down -v)
+
+volumes:
+  finance_data:
+    driver: local
+    name: finance-ai-data
+
+  finance_logs:
+    driver: local
+    name: finance-ai-logs
+
+
+# ── Networks ──────────────────────────────────────────────────────
+# Phase 4: add cloud services (postgres, redis) to this network
+
+networks:
+  default:
+    name: finance-ai-network
