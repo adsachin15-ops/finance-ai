@@ -293,7 +293,7 @@ const App = (() => {
           onclick="App.showAddAccountModal()">+ Add Account</button></div>`;
       return;
     }
-    const icons = { savings:"◆", credit_card:"◈", wallet:"◇", upi:"⬡", cash:"◉" };
+    const icons = { savings:"◆", wallet:"◇", upi:"⬡", cash:"◉" };
     grid.innerHTML = state.accounts.map(a => `
       <div class="account-item" style="padding:16px">
         <div>
@@ -487,7 +487,6 @@ const App = (() => {
         <label>Account Type</label>
         <select id="new-acc-type">
           <option value="savings">Savings Account</option>
-          <option value="credit_card">Credit Card</option>
           <option value="wallet">Wallet</option>
           <option value="upi">UPI</option>
           <option value="cash">Cash</option>

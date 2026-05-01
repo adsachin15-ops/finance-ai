@@ -46,7 +46,7 @@ class Settings(BaseSettings):
 
     # --- File Upload ---
     max_file_size_mb: int = 10
-    allowed_extensions: str = "csv,xlsx,pdf"
+    allowed_extensions: str = "pdf"
     upload_temp_dir: Path = Path("uploads/temp")
 
     # --- AI ---

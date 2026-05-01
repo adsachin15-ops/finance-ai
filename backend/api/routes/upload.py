@@ -44,7 +44,7 @@ from backend.models.account import Account
 from backend.models.transaction import Transaction
 from backend.models.upload_log import UploadLog
 from backend.models.user import User
-from backend.services.file_parser.csv_parser import CSVParser
+from backend.services.file_parser.pdf_parser import PDFParser
 
 log = get_logger(__name__)
 router = APIRouter()
@@ -139,7 +139,7 @@ async def upload_file(
         )
 
     # Create upload log
-    ext = Path(file.filename or "file.csv").suffix.lstrip(".").lower()
+    ext = Path(file.filename or "file.pdf").suffix.lstrip(".").lower()
     upload_log = UploadLog(
         user_id=current_user.id,
         account_id=account_id,
@@ -282,19 +282,13 @@ async def _process_file(
         tmp_path = Path(tmp.name)
 
     try:
-        # Select parser
-        if file_ext == "csv":
-            parser = CSVParser()
-        elif file_ext in ("xlsx", "xls"):
-            from backend.services.file_parser.excel_parser import ExcelParser
-            parser = ExcelParser()
-        elif file_ext == "pdf":
-            from backend.services.file_parser.pdf_parser import PDFParser
-            parser = PDFParser()
-        else:
+        # PDF-only parser
+        if file_ext != "pdf":
             upload_log.status = "failed"
-            upload_log.error_message = f"Unsupported: {file_ext}"
+            upload_log.error_message = f"Only PDF files are supported. Got: .{file_ext}"
             return {"parsed": 0, "inserted": 0, "duplicate": 0, "failed": 0}
+
+        parser = PDFParser()
 
         # Parse rows
         rows = parser.parse(tmp_path)
@@ -340,9 +334,7 @@ async def _process_file(
                     raw_description=row.get(
                         "raw_description", row.get("description", "")
                     ),
-                    source=file_ext if file_ext in (
-                        "csv", "xlsx", "pdf"
-                    ) else "csv",
+                    source="pdf",
                     hash=tx_hash,
                 ))
             except Exception as e:

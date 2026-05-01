@@ -32,7 +32,7 @@ log = get_logger(__name__)
 router = APIRouter()
 
 VALID_ACCOUNT_TYPES = {
-    "savings", "credit_card", "wallet", "upi", "cash"
+    "savings", "wallet", "upi", "cash"
 }
 
 
@@ -42,7 +42,7 @@ class AccountCreate(BaseModel):
     nickname: str = Field(..., min_length=1, max_length=100)
     bank_name: Optional[str] = Field(None, max_length=100)
     account_type: str = Field(
-        ..., description="savings | credit_card | wallet | upi | cash"
+        ..., description="savings | wallet | upi | cash"
     )
     last_four_digits: Optional[str] = Field(
         None, min_length=4, max_length=4, pattern=r"^\d{4}$"
@@ -148,11 +148,7 @@ async def create_account(
         last_four_digits=body.last_four_digits,
         currency=body.currency.upper(),
         current_balance=body.current_balance,
-        credit_limit=(
-            body.credit_limit
-            if body.account_type == "credit_card"
-            else None
-        ),
+        credit_limit=None,
     )
     db.add(account)
     db.commit()

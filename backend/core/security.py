@@ -302,7 +302,6 @@ def validate_upload_file(
 
     # ── ✅ ADD THIS BLOCK HERE ───────────────────
     MAGIC_BYTES = {
-        "xlsx": b"PK\x03\x04",   # zip signature
         "pdf": b"%PDF",
     }
 
