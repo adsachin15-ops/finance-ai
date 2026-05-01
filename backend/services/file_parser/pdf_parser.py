@@ -15,9 +15,6 @@ Strategy:
   2. Fall back to text-line extraction (unstructured PDFs)
   3. Detect header row or assign synthetic headers
   4. Write to temp CSV → delegate to CSVParser
-
-Limitation:
-  Scanned image PDFs require OCR (not supported yet).
 """
 
 from __future__ import annotations
@@ -41,13 +38,15 @@ _HEADER_KEYWORDS = {
     "value date", "posting date", "txn.date", "trans date",
     "debit", "credit", "amount", "balance",
     "narration", "description", "particulars",
-    "details", "remarks", "transaction details",
+    "details", "remarks", "transaction details", "transaction remarks",
     "withdrawal", "deposit", "withdrawals", "deposits",
+    "withdrawal amount", "deposit amount",
     "dr", "cr", "closing balance",
     "chq no", "cheque no", "ref no", "reference",
+    "ref. number", "s no", "s no.",
 }
 
-# ── Date patterns (expanded for all Indian banks) ────────────
+# ── Date patterns (all Indian bank formats) ──────────────────
 _DATE_PATTERNS = [
     # dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy
     re.compile(r"^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$"),
@@ -56,6 +55,13 @@ _DATE_PATTERNS = [
         r"^\d{1,2}[/\-.\s]"
         r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*"
         r"[/\-.\s]\d{2,4}$",
+        re.IGNORECASE,
+    ),
+    # dd-MON-yy (15-SEP-25) — ICICI credit card format
+    re.compile(
+        r"^\d{1,2}-"
+        r"(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)"
+        r"-\d{2,4}$",
         re.IGNORECASE,
     ),
     # yyyy-mm-dd (ISO)
@@ -67,8 +73,6 @@ _DATE_PATTERNS = [
         r"\d{2,4}$",
         re.IGNORECASE,
     ),
-    # dd/mm/yy or dd-mm-yy (2 digit year)
-    re.compile(r"^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2}$"),
 ]
 
 # Money pattern: captures amounts like 1,234.56 or 1234.56
@@ -78,7 +82,7 @@ _MONEY_RE = re.compile(r"[\d,]+\.\d{2}")
 _SYNTHETIC_HEADERS = {
     8: ["Sl No", "Date", "Value Date", "Description", "Ref No", "Debit", "Credit", "Balance"],
     7: ["Date", "Value Date", "Description", "Ref No", "Debit", "Credit", "Balance"],
-    6: ["Date", "Description", "Ref No", "Debit", "Credit", "Balance"],
+    6: ["Date", "Ref No", "Description", "col_3", "col_4", "Amount"],
     5: ["Date", "Description", "Debit", "Credit", "Balance"],
     4: ["Date", "Description", "Amount", "Balance"],
     3: ["Date", "Description", "Amount"],
@@ -98,7 +102,7 @@ class PDFParser:
             with pdfplumber.open(file_path) as pdf:
                 log.info("pdf.pages", count=len(pdf.pages))
 
-                for page_num, page in enumerate(pdf.pages):
+                for page in pdf.pages:
                     # Method 1: Extract tables
                     tables = page.extract_tables()
                     for table in tables:
@@ -108,7 +112,7 @@ class PDFParser:
                             if row and any(c for c in row if c and str(c).strip()):
                                 all_rows.append(row)
 
-                    # Also collect raw text for fallback
+                    # Collect raw text for fallback
                     text = page.extract_text()
                     if text:
                         for line in text.split("\n"):
@@ -126,17 +130,15 @@ class PDFParser:
             text_lines=len(full_text_lines),
         )
 
-        # Try table-based parsing first
+        # Try table-based parsing first (needs at least 3 data rows)
         result = self._parse_from_tables(all_rows)
-
-        if result:
+        if result and len(result) >= 2:
             log.info("pdf.table_parse.success", rows=len(result))
             return result
 
         # Fallback: text-line-based parsing
         log.info("pdf.fallback_to_text_parsing")
         result = self._parse_from_text_lines(full_text_lines)
-
         if result:
             log.info("pdf.text_parse.success", rows=len(result))
             return result
@@ -187,17 +189,16 @@ class PDFParser:
         data_rows = []
 
         if best_header and best_score >= 2:
-            # Use detected header
+            # Collect ALL rows with this column count (across all pages)
             group = by_col[best_col_count]
             data_rows = [
                 r for r in group
-                if r is not best_header and self._header_score(r) < 2
+                if self._header_score(r) < 2
             ]
 
             # Validate: at least some rows have dates
             date_rows = [r for r in data_rows if self._row_has_date(r)]
             if not date_rows:
-                # Header found but no date data — try synthetic
                 best_header = None
 
         if best_header is None:
@@ -215,11 +216,41 @@ class PDFParser:
         if not best_header or not data_rows:
             return []
 
-        # Clean header
+        # Clean header: strip whitespace, replace newlines
         clean_header = [
             str(h).replace("\n", " ").strip() if h else f"col_{i}"
             for i, h in enumerate(best_header)
         ]
+
+        # Fix ICICI Credit Card: header has empty Date (col_0) and Amount (col_5)
+        # Detect: first column data has dates, header says "col_0"
+        if clean_header[0].startswith("col_") and data_rows:
+            # Check if first column has date-like values
+            first_col_dates = sum(
+                1 for r in data_rows[:10]
+                if r[0] and self._row_has_date([r[0]])
+            )
+            if first_col_dates >= 3:
+                clean_header[0] = "Date"
+                log.info("pdf.fix_header.date_col", original="col_0")
+
+        # Fix unnamed last column that contains amounts
+        last_idx = len(clean_header) - 1
+        if clean_header[last_idx].startswith("col_") and data_rows:
+            # Check if last column has money-like values
+            money_count = sum(
+                1 for r in data_rows[:10]
+                if r[last_idx] and _MONEY_RE.search(str(r[last_idx]).replace(",", "").strip())
+            )
+            if money_count >= 3:
+                clean_header[last_idx] = "Amount"
+                log.info("pdf.fix_header.amount_col", original=f"col_{last_idx}")
+
+        log.info(
+            "pdf.table_parse.header",
+            header=[h[:25] for h in clean_header],
+            data_rows=len(data_rows),
+        )
 
         return self._to_parsed_rows(data_rows, clean_header)
 
@@ -230,105 +261,198 @@ class PDFParser:
     def _parse_from_text_lines(self, lines: list[str]) -> list[dict]:
         """
         Parse transactions from raw text lines.
-        Works for PDFs where pdfplumber can't detect table structure
-        (common with SBI, some HDFC statements).
+        Handles PDFs where tables only contain headers (ICICI savings)
+        or have no table structure at all (SBI).
 
-        Approach:
-          1. Find lines that start with a date
-          2. Extract amounts from those lines
-          3. Build structured rows
+        Special handling for multi-line ICICI format:
+          1 30.01.2026 16000.00 55993.42
+          UPI/GROWW INVE/groww.rzp.brk@/...
         """
         if not lines:
             return []
 
-        transaction_lines: list[dict] = []
+        # -----------------------------------------------------------
+        # Strategy A: ICICI savings format
+        #   "S_No  DD.MM.YYYY  [description_fragment]  amount  balance"
+        #   Next line(s) contain rest of description
+        # -----------------------------------------------------------
+        icici_pattern = re.compile(
+            r"^\d+\s+"                         # S.No
+            r"(\d{1,2}\.\d{1,2}\.\d{4})\s+"    # Date (dd.mm.yyyy)
+            r"(.+?)\s+"                         # Description fragment
+            r"([\d,]+\.\d{2})\s+"              # Amount 1
+            r"([\d,]+\.\d{2})\s*$"             # Amount 2 (balance)
+        )
 
-        for i, line in enumerate(lines):
-            date_match = self._extract_date_from_line(line)
-            if not date_match:
+        # ICICI variant: S_No  DD.MM.YYYY  amount  balance (no inline desc)
+        icici_pattern_nodesc = re.compile(
+            r"^\d+\s+"                         # S.No
+            r"(\d{1,2}\.\d{1,2}\.\d{4})\s+"    # Date
+            r"([\d,]+\.\d{2})\s+"              # Amount
+            r"([\d,]+\.\d{2})\s*$"             # Balance
+        )
+
+        transactions = []
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Try ICICI format with inline description
+            m = icici_pattern.match(line)
+            if m:
+                date_str = m.group(1)
+                desc_fragment = m.group(2).strip()
+                amount1 = m.group(3)
+                amount2 = m.group(4)  # Usually the balance
+
+                # Collect continuation lines (description wraps)
+                desc_parts = [desc_fragment]
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j].strip()
+                    # Stop if next line is a new transaction or header
+                    if icici_pattern.match(next_line) or icici_pattern_nodesc.match(next_line):
+                        break
+                    if self._extract_date_from_line(next_line):
+                        break
+                    if next_line.startswith("Transaction") or next_line.startswith("S No"):
+                        break
+                    if next_line and not next_line[0].isdigit():
+                        desc_parts.append(next_line)
+                        j += 1
+                    else:
+                        break
+
+                full_desc = " ".join(desc_parts).strip()
+                amt = float(amount1.replace(",", ""))
+
+                # Determine debit/credit from description
+                upper = full_desc.upper()
+                if any(k in upper for k in ["SALARY", "RECEIVED", "DEPOSIT", "REFUND", "CREDIT", "NEFT CR", "CASHBACK"]):
+                    tx = {"date": date_str, "description": full_desc[:500], "debit": 0, "credit": amt}
+                else:
+                    tx = {"date": date_str, "description": full_desc[:500], "debit": amt, "credit": 0}
+
+                transactions.append(tx)
+                i = j
                 continue
 
-            date_str = date_match
-            remainder = line[len(date_str):].strip()
+            # Try ICICI format without inline description
+            m2 = icici_pattern_nodesc.match(line)
+            if m2:
+                date_str = m2.group(1)
+                amount1 = m2.group(2)
+                amount2 = m2.group(3)
 
-            # Extract all money amounts from the line
-            amounts = _MONEY_RE.findall(remainder)
+                # Next lines are description
+                desc_parts = []
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j].strip()
+                    if icici_pattern.match(next_line) or icici_pattern_nodesc.match(next_line):
+                        break
+                    if self._extract_date_from_line(next_line):
+                        break
+                    if next_line.startswith("Transaction") or next_line.startswith("S No"):
+                        break
+                    if next_line:
+                        desc_parts.append(next_line)
+                        j += 1
+                    else:
+                        break
 
-            if not amounts:
-                # Check next line for amounts (multi-line transactions)
-                if i + 1 < len(lines):
+                full_desc = " ".join(desc_parts).strip()
+                amt = float(amount1.replace(",", ""))
+
+                upper = full_desc.upper()
+                if any(k in upper for k in ["SALARY", "RECEIVED", "DEPOSIT", "REFUND", "CREDIT", "NEFT CR", "CASHBACK"]):
+                    tx = {"date": date_str, "description": full_desc[:500], "debit": 0, "credit": amt}
+                else:
+                    tx = {"date": date_str, "description": full_desc[:500], "debit": amt, "credit": 0}
+
+                transactions.append(tx)
+                i = j
+                continue
+
+            # -----------------------------------------------------------
+            # Strategy B: Generic — line starts with a date
+            # -----------------------------------------------------------
+            date_match = self._extract_date_from_line(line)
+            if date_match:
+                remainder = line[len(date_match):].strip()
+                amounts = _MONEY_RE.findall(remainder)
+
+                if not amounts and i + 1 < len(lines):
                     next_line = lines[i + 1]
                     if not self._extract_date_from_line(next_line):
                         amounts = _MONEY_RE.findall(next_line)
                         remainder = remainder + " " + next_line.strip()
 
-            if not amounts:
-                continue
+                if amounts:
+                    desc = remainder
+                    for amt_str in amounts:
+                        desc = desc.replace(amt_str, "").strip()
+                    desc = re.sub(r"\s{2,}", " ", desc).strip(" -/|")
 
-            # Remove amounts from the description
-            desc = remainder
-            for amt in amounts:
-                desc = desc.replace(amt, "").strip()
-            # Clean up extra spaces and separators
-            desc = re.sub(r"\s{2,}", " ", desc).strip(" -/|")
+                    parsed_amts = []
+                    for a in amounts:
+                        try:
+                            parsed_amts.append(float(a.replace(",", "")))
+                        except ValueError:
+                            pass
 
-            # Parse amounts
-            parsed_amounts = []
-            for a in amounts:
-                try:
-                    parsed_amounts.append(float(a.replace(",", "")))
-                except ValueError:
-                    pass
+                    if parsed_amts:
+                        tx = self._build_text_transaction(date_match, desc, parsed_amts)
+                        if tx:
+                            transactions.append(tx)
 
-            if not parsed_amounts:
-                continue
+            i += 1
 
-            # Determine debit/credit/balance
-            if len(parsed_amounts) >= 3:
-                # Likely: debit, credit, balance
-                debit = parsed_amounts[0] if parsed_amounts[0] > 0 else 0
-                credit = parsed_amounts[1] if parsed_amounts[1] > 0 else 0
-                row = {
-                    "date": date_str,
-                    "description": desc[:500],
-                    "debit": debit,
-                    "credit": credit,
-                }
-            elif len(parsed_amounts) == 2:
-                # Could be: amount + balance, or debit + credit
-                # Heuristic: if one is much larger, it's probably the balance
-                a1, a2 = parsed_amounts
-                if a2 > a1 * 3:
-                    # a1 = transaction amount, a2 = balance
-                    # Check description for CR/DR hints
-                    upper_desc = desc.upper()
-                    if any(k in upper_desc for k in ["CR", "CREDIT", "DEPOSIT", "RECEIVED", "SALARY"]):
-                        row = {"date": date_str, "description": desc[:500], "debit": 0, "credit": a1}
-                    else:
-                        row = {"date": date_str, "description": desc[:500], "debit": a1, "credit": 0}
-                else:
-                    row = {"date": date_str, "description": desc[:500], "debit": a1, "credit": a2}
-            else:
-                # Single amount
-                amt = parsed_amounts[0]
-                upper_desc = desc.upper()
-                if any(k in upper_desc for k in ["CR", "CREDIT", "DEPOSIT", "RECEIVED", "SALARY", "REFUND"]):
-                    row = {"date": date_str, "description": desc[:500], "debit": 0, "credit": amt}
-                elif any(k in upper_desc for k in ["DR", "DEBIT", "WITHDRAWAL", "PAYMENT", "PURCHASE"]):
-                    row = {"date": date_str, "description": desc[:500], "debit": amt, "credit": 0}
-                else:
-                    row = {"date": date_str, "description": desc[:500], "debit": amt, "credit": 0}
-
-            transaction_lines.append(row)
-
-        if not transaction_lines:
+        if not transactions:
             return []
 
-        log.info("pdf.text_parse.transactions_found", count=len(transaction_lines))
-
-        # Convert to DataFrame → temp CSV → CSVParser
-        df = pd.DataFrame(transaction_lines)
+        log.info("pdf.text_parse.found", count=len(transactions))
+        df = pd.DataFrame(transactions)
         return self._df_to_parsed_rows(df)
+
+    def _build_text_transaction(self, date_str: str, desc: str, amounts: list[float]) -> dict | None:
+        """Build a transaction dict from extracted text data."""
+        upper_desc = desc.upper()
+        is_credit = any(k in upper_desc for k in [
+            "CR", "CREDIT", "DEPOSIT", "RECEIVED", "SALARY", "REFUND",
+            "CASHBACK", "REVERSAL", "NEFT CR",
+        ])
+        is_debit = any(k in upper_desc for k in [
+            "DR", "DEBIT", "WITHDRAWAL", "PAYMENT", "PURCHASE",
+            "PAID", "TRANSFER",
+        ])
+
+        if len(amounts) >= 3:
+            # debit, credit, balance
+            debit = amounts[0] if amounts[0] > 0 else 0
+            credit = amounts[1] if amounts[1] > 0 else 0
+            return {"date": date_str, "description": desc[:500], "debit": debit, "credit": credit}
+        elif len(amounts) == 2:
+            a1, a2 = amounts
+            if a2 > a1 * 3:
+                # a2 is probably balance
+                if is_credit:
+                    return {"date": date_str, "description": desc[:500], "debit": 0, "credit": a1}
+                else:
+                    return {"date": date_str, "description": desc[:500], "debit": a1, "credit": 0}
+            else:
+                return {"date": date_str, "description": desc[:500], "debit": a1, "credit": a2}
+        elif len(amounts) == 1:
+            amt = amounts[0]
+            if amt < 0:
+                return {"date": date_str, "description": desc[:500], "debit": 0, "credit": abs(amt)}
+            elif is_credit and not is_debit:
+                return {"date": date_str, "description": desc[:500], "debit": 0, "credit": amt}
+            else:
+                return {"date": date_str, "description": desc[:500], "debit": amt, "credit": 0}
+
+        return None
 
     # ══════════════════════════════════════════════════════════
     # Shared helpers
@@ -399,20 +523,16 @@ class PDFParser:
 
     @staticmethod
     def _extract_date_from_line(line: str) -> str | None:
-        """Try to extract a date from the beginning of a text line."""
+        """Extract a date from the beginning of a text line."""
         line = line.strip()
         if not line:
             return None
 
-        # Try each date pattern at the start of the line
         date_regexes = [
-            # dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
             r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}",
-            # dd Mon yyyy or dd-Mon-yyyy
             r"\d{1,2}[/\-.\s](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[/\-.\s]\d{2,4}",
-            # dd Mon yy (no separator)
+            r"\d{1,2}-(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-\d{2,4}",
             r"\d{1,2}(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\d{2,4}",
-            # yyyy-mm-dd
             r"\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}",
         ]
 

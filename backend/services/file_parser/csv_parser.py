@@ -63,12 +63,13 @@ DATE_FORMATS = [
     "%d-%b-%y",
     "%d %b %Y",     # 01 Jan 2025
     "%d %b %y",      # 01 Jan 25
-    "%d.%m.%Y",      # 01.01.2025
+    "%d.%m.%Y",      # 01.01.2025 (ICICI savings)
     "%d.%m.%y",      # 01.01.25
     "%d/%b/%Y",      # 01/Jan/2025
     "%d/%b/%y",      # 01/Jan/25
     "%b %d, %Y",     # Jan 01, 2025
     "%d-%B-%Y",      # 01-January-2025
+    "%d-%B-%y",      # 01-January-25
 ]
 
 
